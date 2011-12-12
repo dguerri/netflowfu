@@ -1,0 +1,107 @@
+= netflowfu
+
+NetflowFu a netflow v5/v9 library for Ruby that sits on top of PacketFu.
+It permits to easily develop both netflow collectors and netflow exporters.
+
+<em>Plese note</em>
+Please keep in mind that this software is in alpha development stage.
+At present time only collector is tested and there are some missing featues.
+
+== Usage
+
+=== Receiving data from an exporter (with eventmachine)
+
+    require 'netflowfu'
+    require 'eventmachine'
+
+    class NetflowCallbacks
+
+      def netflow5_callback(packet)
+        # Put code to handle netflow 5 flows here
+        puts "netflow5 flows received"
+        packet.flows.each { |x| puts x.humanize + "\n" }
+      end
+
+      def netflow9_callback(packet)
+        # Put code to handle netflow 9 flows here
+        puts "netflow9 decoded_flowset received"
+        packet.data_flowsets.each { |x| puts x.humanize }
+      end
+
+    end
+
+    module Collector
+  
+      def post_init
+        @collector = NetflowCollector.new(:netflow_callbacks => NetflowCallbacks.new)
+      end
+
+      def receive_data(data)
+        puts "Data received"
+        @collector.receive(data)
+      end
+    end
+
+    EventMachine::run { EventMachine::open_datagram_socket("0.0.0.0", 9999, Collector) }
+
+=== Extracting data from a pcap file (e.g. for benchmarking)
+
+    class NetflowCallbacks
+
+      def netflow5_callback(packet)
+        # Put code to handle netflow 5 flows here
+        puts "netflow5 flows received"
+        packet.flows.each { |x| puts x.humanize + "\n" }
+      end
+
+      def netflow9_callback(packet)
+        # Put code to handle netflow 9 flows here
+        puts "netflow9 decoded_flowset received"
+        packet.data_flowsets.each { |x| puts x.humanize }
+      end
+
+    end
+
+    def do_the_job(file)
+      file = File.open(file) { |f| f.read }
+
+      collector = NetflowCollector.new(:netflow_callbacks => NetflowCallbacks.new)
+
+      pcap_file = PacketFu::PcapPackets.new
+      pcap_file.read(file)
+      i=0
+      start_t = Time.now
+      pcap_file.each do |p|
+        # Now it's a PacketFu packet struct.
+        pkt = PacketFu::Packet.parse(p.data)
+        begin
+          if pkt.udp_dst == 9999
+            collector.receive(pkt.payload)
+            i+=1
+          end
+        rescue Exception => e
+          puts "#{e}\n#{e.backtrace}"
+        end
+      end
+      stop_t = Time.now
+
+      fps = i / (stop_t - start_t)
+      puts "Flow per seconds = #{fps}"
+    end
+
+    do_the_job("./netflow-pcap-file.pcap")
+
+== Contributing to netflowfu
+ 
+* Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet
+* Check out the issue tracker to make sure someone already hasn't requested it and/or contributed it
+* Fork the project
+* Start a feature/bugfix branch
+* Commit and push until you are happy with your contribution
+* Make sure to add tests for it. This is important so I don't break it in a future version unintentionally.
+* Please try not to mess with the Rakefile, version, or history. If you want to have your own version, or is otherwise necessary, that is fine, but please isolate to its own commit so I can cherry-pick around it.
+
+== Copyright
+
+Copyright (C) 2011 Davide Guerri. See LICENSE.txt for further details.
+
