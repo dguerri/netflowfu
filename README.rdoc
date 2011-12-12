@@ -3,9 +3,16 @@
 NetflowFu a netflow v5/v9 library for Ruby that sits on top of PacketFu.
 It permits to easily develop both netflow collectors and netflow exporters.
 
-<em>Plese note</em>
+<b><em>Note</em></b>
+
 Please keep in mind that this software is in alpha development stage.
 At present time only collector is tested and there are some missing featues.
+
+== Installation
+
+    # git clone git://github.com/dguerri/netflowfu.git
+    # bundle install
+    # rake install
 
 == Usage
 
