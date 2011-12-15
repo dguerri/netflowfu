@@ -27,6 +27,7 @@ module PacketFu
     include StructFu
 
     def initialize(args={})
+      raise(ArgumentError, "Invalid field_length") if (!args[:field_length].nil? and args[:field_length] <= 0)
       super(
           Int16.new(args[:field_type]),
           Int16.new(args[:field_length])
@@ -44,16 +45,18 @@ module PacketFu
       return self if (!str.respond_to? :to_s or str.nil?)
       self[:field_type].read(str[0, 2])
       self[:field_length].read(str[2, 2])
-
+      raise(ArgumentError, "Invalid field_length") if (self[:field_length].to_i <= 0)
       self
     end
-
 
     # Accessor methods
     def field_type=(i); self[:field_type] = typecast i end
     def field_type; self[:field_type].to_i end
 
-    def field_length=(i); self[:field_length] = typecast i end
+    def field_length=(i)
+      self[:field_length] = typecast i
+      raise(ArgumentError, "Invalid field_length") if (self[:field_length].to_i <= 0)
+    end
     def field_length; self[:field_length].to_i end
 
   end
@@ -128,10 +131,10 @@ module PacketFu
     def template_id=(i); self[:template_id] = typecast i end
     def template_id; self[:template_id].to_i end
 
-    def template_fields_count=(i); self[:field_length] = typecast i end # Usually recalc()'ed
-    def template_fields_count; self[:field_length].to_i end
+    def template_fields_count=(i); self[:template_fields_count] = typecast i end # Usually recalc()'ed
+    def template_fields_count; self[:template_fields_count].to_i end
 
-    # Recalculates calculated fields for Netflow 5.
+    # Recalculates calculated fields for Netflow 9.
     def recalc(args=:all)
       case args
         when :template_fields_count
@@ -139,7 +142,7 @@ module PacketFu
         when :all
           self.template_fields_count = self[:template_fields].count
         else
-          raise ArgumentError, "No such field '#{args}'"
+          raise(ArgumentError, "No such field '#{args}'")
       end
     end
 
@@ -183,8 +186,9 @@ module PacketFu
     include StructFu
 
     def initialize(args={})
-      @field_type = args.delete(:field_type) || raise("Missing argument field_type")
-      @field_length = args.delete(:field_length) || raise("Missing argument field_length")
+      @field_type = args.delete(:field_type) || raise(ArgumentError, "Missing argument field_type")
+      @field_length = args.delete(:field_length) || raise(ArgumentError, "Missing argument field_length")
+      raise(ArgumentError, "Invalid field_length") if (@field_length <= 0)
 
       super
 
@@ -1653,7 +1657,7 @@ module PacketFu
       i = 0
       @template_fields.each do |template_field|
         if i >= str.size
-          raise "Invalid packet"
+          raise("Invalid packet")
         end
         # Instantiate the right class for this flow field
         this_flow_field_class = Netflow9FlowField.field_type_to_class(template_field.field_type.to_i)
@@ -1863,6 +1867,7 @@ module PacketFu
     include StructFu
 
     def initialize(args={})
+      raise(ArgumentError, "Invalid flowset_length") if (!args[:flowset_length].nil? and args[:flowset_length] <= 0)
       super(
           Int16.new(args[:flowset_id]),
           Int16.new(args[:flowset_length]),
@@ -1878,7 +1883,7 @@ module PacketFu
             elsif args[:flowset_id].to_i > 255
               Netflow9DataFlows.new.read(args[:flows])
             else
-              raise ArgumentError, "Unknown flowset `#{args[:flowset_id].to_i}'"
+              raise(ArgumentError, "Unknown flowset `#{args[:flowset_id].to_i}'")
             end
           end
       )
@@ -1897,6 +1902,8 @@ module PacketFu
       return self if str.nil?
       self[:flowset_id].read(str[0, 2])
       self[:flowset_length].read(str[2, 2])
+      raise("Invalid flowset_length") if self[:flowset_length].to_i <= 4
+
       if self[:flowset_id].to_i == 0
         self[:flows]=Netflow9Templates.new
       elsif self[:flowset_id].to_i == 1
@@ -1934,7 +1941,10 @@ module PacketFu
     def flowset_id=(i); self[:flowset_id] = typecast i end
     def flowset_id; self[:flowset_id].to_i end
 
-    def flowset_length=(i); self[:flowset_length] = typecast i end # Usually calc()'ed
+    def flowset_length=(i)
+      self[:flowset_length] = typecast i
+      raise(ArgumentError,"Invalid flowset_length") if self[:flowset_length].to_i <= 4
+    end # Usually calc()'ed
     def flowset_length; self[:flowset_length].to_i end
 
     # Recalculates calculated fields.
@@ -1945,7 +1955,7 @@ module PacketFu
         when :all
           self.flowset_length = self.to_s.size
         else
-          raise ArgumentError, "No such field '#{args}'"
+          raise(ArgumentError, "No such field '#{args}'")
       end
     end
 
@@ -2100,7 +2110,7 @@ module PacketFu
           self.flow_records = self.flowsets.count_flows
           self.unix_seconds = Time.now.to_i
         else
-          raise ArgumentError, "No such field '#{args}'"
+          raise(ArgumentError, "No such field '#{args}'")
       end
     end
 
