@@ -43,6 +43,8 @@ module PacketFu
       PacketFu.force_binary(str)
 
       return self if (!str.respond_to? :to_s or str.nil?)
+      raise(ArgumentError, "Invalid srt length") if str.size < 4
+
       self[:field_type].read(str[0, 2])
       self[:field_length].read(str[2, 2])
       raise(ArgumentError, "Invalid field_length") if (self[:field_length].to_i <= 0)
@@ -77,7 +79,7 @@ module PacketFu
       return self if (!str.respond_to? :to_s or str.nil?)
       i = 0
       while i < str.to_s.size
-        this_record = Netflow9TemplateField.new.read(str[i, str.size])
+        this_record = Netflow9TemplateField.new.read(str[i, str.size-i])
         self << this_record
         #noinspection RubyResolve
         i += this_record.sz
@@ -120,9 +122,11 @@ module PacketFu
       PacketFu.force_binary(str)
 
       return self if (!str.respond_to? :to_s or str.nil?)
+      raise(ArgumentError, "Invalid srt length") if str.size <= 4
+
       self[:template_id].read(str[0, 2])
       self[:template_fields_count].read(str[2, 2])
-      self[:template_fields].read(str[4, [str.size, 4 * self[:template_fields_count].to_i].min])
+      self[:template_fields].read(str[4, 4 * self[:template_fields_count].to_i])
 
       self
     end
@@ -164,7 +168,7 @@ module PacketFu
       return self if (!str.respond_to? :to_s or str.nil?)
       i = 0
       while i < str.to_s.size
-        this_record = Netflow9Template.new.read(str[i, str.size])
+        this_record = Netflow9Template.new.read(str[i, str.size-i])
         self << this_record
         #noinspection RubyResolve
         i += this_record.sz
@@ -212,7 +216,10 @@ module PacketFu
     # Reads a string to populate the object.
     def read(str)
       force_binary(str)
+
       return self if str.nil?
+      raise(ArgumentError, "Invalid srt length") if str.size < @field_length
+
       self[:value].read(str[0, @field_length])
 
       self
@@ -1656,9 +1663,8 @@ module PacketFu
 
       i = 0
       @template_fields.each do |template_field|
-        if i >= str.size
-          raise("Invalid packet")
-        end
+        raise("Invalid packet") if i >= str.size
+
         # Instantiate the right class for this flow field
         this_flow_field_class = Netflow9FlowField.field_type_to_class(template_field.field_type.to_i)
         this_flow_field = if this_flow_field_class.nil?
@@ -1706,7 +1712,7 @@ module PacketFu
     def to_s(args={})
       str = self.map { |x| x.to_s }.join
       # Add the padding
-      str + ("\x00" * (4 - (str.size % 4)))
+      str + ("\x00" *  ((str.size % 4) == 0 ? 0 : 4 - (str.size % 4)))
     end
 
     # Reads a string to populate the object.
@@ -1738,7 +1744,7 @@ module PacketFu
     def to_s(args={})
       str = self.map { |x| x.to_s }.join
       # Add the padding
-      str + ("\x00" * (4 - (str.size % 4)))
+      str + ("\x00" *  ((str.size % 4) == 0 ? 0 : 4 - (str.size % 4)))
     end
 
     # Reads a string to populate the object.
@@ -1829,7 +1835,8 @@ module PacketFu
     end
 
     def to_s(args={})
-      self.map { |x| x.to_s }.join
+      str = self.map { |x| x.to_s }.join
+      str + ("\x00" *  ((str.size % 4) == 0 ? 0 : 4 - (str.size % 4)))
     end
 
     # Reads a string to populate the object.
@@ -1900,9 +1907,13 @@ module PacketFu
       PacketFu.force_binary(str)
 
       return self if str.nil?
+      raise(ArgumentError, "Invalid srt length") if str.size < 4
+
       self[:flowset_id].read(str[0, 2])
       self[:flowset_length].read(str[2, 2])
+
       raise("Invalid flowset_length") if self[:flowset_length].to_i <= 4
+      raise(ArgumentError, "Invalid str length") if str.size < self[:flowset_length].to_i
 
       if self[:flowset_id].to_i == 0
         self[:flows]=Netflow9Templates.new
@@ -1915,7 +1926,7 @@ module PacketFu
         self[:flows]=Netflow9UnknownFlows.new
       end
       # flowset_length is the len of the whole flowset, id and len included
-      self[:flows].read(str[4, [str.size, self[:flowset_length].to_i - 4].min])
+      self[:flows].read(str[4, self[:flowset_length].to_i - 4])
 
       self
     end
@@ -1981,8 +1992,8 @@ module PacketFu
       return self if (!str.respond_to? :to_s or str.nil?)
 
       i = 0
-      while i < str.to_s.size
-        this_record = Netflow9Flowset.new.read(str[i, str.size])
+      while i < str.size
+        this_record = Netflow9Flowset.new.read(str[i, str.size-i])
         self << this_record
         #noinspection RubyResolve
         i += this_record.sz
@@ -2052,6 +2063,7 @@ module PacketFu
     def read(str)
       PacketFu.force_binary(str)
 
+      raise(ArgumentError, "Invalid str length") if str.size <= 20
       return self if str.nil?
       self[:version].read(str[0, 2])
       self[:flow_records].read(str[2, 2])
@@ -2059,7 +2071,7 @@ module PacketFu
       self[:unix_seconds].read(str[8, 4])
       self[:flow_sequence_number].read(str[12, 4])
       self[:source_id].read(str[16, 4])
-      self[:flowsets].read(str[20, str.size])
+      self[:flowsets].read(str[20, str.size-20])
 
       self
     end
